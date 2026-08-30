@@ -38,7 +38,9 @@ terraform apply main.tfplan
 terraform output -raw container_app_url
 ```
 
-Para autenticación del proveedor puede usarse `az login`; Terraform usará la sesión de Azure CLI. También puedes establecer `ARM_SUBSCRIPTION_ID` en lugar de guardar el ID en un archivo local.
+Para autenticación del proveedor puede usarse `az login --tenant <TENANT_ID>`; Terraform usará la sesión de Azure CLI. También puedes establecer `ARM_SUBSCRIPTION_ID` y `ARM_TENANT_ID` en lugar de guardar los IDs en un archivo local.
+
+El proveedor registra automáticamente `Microsoft.App` y `Microsoft.OperationalInsights` durante `plan/apply`. La identidad autenticada necesita permiso `Microsoft.Resources/subscriptions/providers/register/action`, incluido normalmente en los roles `Contributor` y `Owner`.
 
 ## Registry privado
 
