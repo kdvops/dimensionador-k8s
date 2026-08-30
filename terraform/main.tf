@@ -13,8 +13,8 @@ provider "azurerm" {
   features {}
   resource_provider_registrations = "none"
   resource_providers_to_register  = ["Microsoft.App", "Microsoft.OperationalInsights"]
-  subscription_id = var.subscription_id
-  tenant_id       = var.tenant_id
+  subscription_id                 = var.subscription_id
+  tenant_id                       = var.tenant_id
 }
 
 resource "azurerm_resource_group" "this" {
