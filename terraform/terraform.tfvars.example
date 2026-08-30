@@ -4,17 +4,17 @@ name                = "dimensionador-k8s"
 resource_group_name = "rg-dimensionador-k8s"
 location            = "East US"
 
-# Replace with the image built by your CI/CD pipeline.
-container_image = "ghcr.io/your-org/your-image:latest"
+# Image published by .github/workflows/build.yml on pushes to main.
+# Available tags: latest, main, and sha-<short-commit-sha>.
+container_image = "ghcr.io/kdvops/dimensionador-k8s:latest"
 container_port  = 3000
 
-# For a private registry, uncomment and provide values through a secure
-# mechanism such as TF_VAR_registry_password or a CI secret.
-# registry_server   = "myregistry.azurecr.io"
-# registry_username = "..."
+# For a private GHCR package, provide credentials securely through variables.
+# registry_server   = "ghcr.io"
+# registry_username = "kdvops"
 # registry_password = "..."
+# Prefer TF_VAR_registry_password instead of storing the password in this file.
 
 container_env = {
-  ASPNETCORE_ENVIRONMENT = "Production"
+  NODE_ENV = "production"
 }
-
