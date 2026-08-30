@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.sites-runtime
+.wrangler
+outputs
+work
+*.zip
+npm-debug.log*
+.env*
