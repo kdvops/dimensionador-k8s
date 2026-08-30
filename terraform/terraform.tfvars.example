@@ -1,0 +1,20 @@
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+name                = "dimensionador-k8s"
+resource_group_name = "rg-dimensionador-k8s"
+location            = "East US"
+
+# Replace with the image built by your CI/CD pipeline.
+container_image = "ghcr.io/your-org/your-image:latest"
+container_port  = 3000
+
+# For a private registry, uncomment and provide values through a secure
+# mechanism such as TF_VAR_registry_password or a CI secret.
+# registry_server   = "myregistry.azurecr.io"
+# registry_username = "..."
+# registry_password = "..."
+
+container_env = {
+  ASPNETCORE_ENVIRONMENT = "Production"
+}
+
