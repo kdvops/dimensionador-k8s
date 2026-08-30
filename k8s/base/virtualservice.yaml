@@ -1,0 +1,21 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: dimensionador-k8s
+  labels:
+    app.kubernetes.io/name: dimensionador-k8s
+    app.kubernetes.io/part-of: dimensionador-k8s
+spec:
+  gateways:
+    - istio-system/kdvops-gateway
+  hosts:
+    - dimensionador-k8s.kdvops.com
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: dimensionador-k8s
+            port:
+              number: 80

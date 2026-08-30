@@ -1,0 +1,8 @@
+resources:
+  - ../../base
+
+namespace: dimensionador-k8s
+
+images:
+  - name: ghcr.io/kdvops/dimensionador-k8s
+    newTag: latest

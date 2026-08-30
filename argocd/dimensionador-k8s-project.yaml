@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: dimensionador-k8s
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: dimensionador-k8s
+    app.kubernetes.io/part-of: dimensionador-k8s
+spec:
+  description: GitOps project for dimensionador-k8s
+  sourceRepos:
+    - https://github.com/kdvops/dimensionador-k8s.git
+  destinations:
+    - namespace: dimensionador-k8s
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace

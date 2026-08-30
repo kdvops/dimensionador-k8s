@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dimensionador-k8s
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: dimensionador-k8s
+    app.kubernetes.io/part-of: dimensionador-k8s
+spec:
+  project: dimensionador-k8s
+  source:
+    repoURL: https://github.com/kdvops/dimensionador-k8s.git
+    targetRevision: main
+    path: k8s/overlays/k3s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dimensionador-k8s
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - ServerSideApply=true
