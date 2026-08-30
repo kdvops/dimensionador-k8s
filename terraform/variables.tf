@@ -5,6 +5,13 @@ variable "subscription_id" {
   sensitive   = true
 }
 
+variable "tenant_id" {
+  description = "Azure tenant ID. Can also be supplied through ARM_TENANT_ID."
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
 variable "name" {
   description = "Globally unique Container App name within the resource group."
   type        = string
