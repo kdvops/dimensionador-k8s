@@ -1,0 +1,92 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Install and Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect package manager
+        id: package-manager
+        shell: bash
+        run: |
+          if [[ -f pnpm-lock.yaml ]]; then
+            echo "manager=pnpm" >> "$GITHUB_OUTPUT"
+          elif [[ -f yarn.lock ]]; then
+            echo "manager=yarn" >> "$GITHUB_OUTPUT"
+          elif [[ -f package-lock.json ]]; then
+            echo "manager=npm" >> "$GITHUB_OUTPUT"
+          else
+            echo "No supported lockfile found (pnpm-lock.yaml, yarn.lock, or package-lock.json)." >&2
+            exit 1
+          fi
+
+      - name: Setup pnpm
+        if: steps.package-manager.outputs.manager == 'pnpm'
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js (npm)
+        if: steps.package-manager.outputs.manager == 'npm'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Node.js (yarn)
+        if: steps.package-manager.outputs.manager == 'yarn'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+
+      - name: Setup Node.js (pnpm)
+        if: steps.package-manager.outputs.manager == 'pnpm'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies (npm)
+        if: steps.package-manager.outputs.manager == 'npm'
+        run: npm ci
+
+      - name: Install dependencies (yarn)
+        if: steps.package-manager.outputs.manager == 'yarn'
+        run: yarn install --frozen-lockfile
+
+      - name: Install dependencies (pnpm)
+        if: steps.package-manager.outputs.manager == 'pnpm'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (npm)
+        if: steps.package-manager.outputs.manager == 'npm'
+        run: npm run build
+
+      - name: Build (yarn)
+        if: steps.package-manager.outputs.manager == 'yarn'
+        run: yarn build
+
+      - name: Build (pnpm)
+        if: steps.package-manager.outputs.manager == 'pnpm'
+        run: pnpm build
