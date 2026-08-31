@@ -9,7 +9,7 @@ spec:
   gateways:
     - istio-system/kdvops-gateway
   hosts:
-    - dimensionador-k8s.kdvops.com
+    - dimensionador.kdvops.com
   http:
     - match:
         - uri:
