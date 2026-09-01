@@ -26,21 +26,37 @@ async function readJson(url, token, signal) {
   return response.json();
 }
 
-async function readText(url, token, signal) {
-  const response = await fetch(url, {
-    signal,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "text/plain",
-    },
-    cache: "no-store",
-  });
+async function readPodLogs(url, token, signal) {
+  const attempts = [
+    { Accept: "text/plain, */*" },
+    { Accept: "*/*" },
+    {},
+  ];
 
-  if (!response.ok) {
-    throw new Error(`${url} returned ${response.status}`);
+  let lastError = null;
+
+  for (const headers of attempts) {
+    const response = await fetch(url, {
+      signal,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...headers,
+      },
+      cache: "no-store",
+    });
+
+    if (response.ok) {
+      return response.text();
+    }
+
+    lastError = new Error(`${url} returned ${response.status}`);
+
+    if (response.status !== 406) {
+      throw lastError;
+    }
   }
 
-  return response.text();
+  throw lastError ?? new Error(`${url} returned 406`);
 }
 
 function buildBaseUrl() {
@@ -94,7 +110,7 @@ export async function GET(request) {
         throw new Error(`Pod ${namespace}/${podName} has no containers`);
       }
 
-      const logText = await readText(
+      const logText = await readPodLogs(
         `${baseUrl}/api/v1/namespaces/${encodeURIComponent(namespace)}/pods/${encodeURIComponent(podName)}/log?container=${encodeURIComponent(container)}&tailLines=${tailLines}&timestamps=true`,
         token,
         controller.signal,
