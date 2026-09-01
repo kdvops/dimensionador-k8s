@@ -183,7 +183,7 @@ export default function Home() {
   const [clusterError, setClusterError] = useState<string | null>(null);
   const [clusterNonce, setClusterNonce] = useState(0);
   const [podSearch, setPodSearch] = useState("");
-  const [selectedNamespace, setSelectedNamespace] = useState<string>("all");
+  const [selectedNamespace, setSelectedNamespace] = useState<string>("");
   const [selectedPodKey, setSelectedPodKey] = useState<string>("");
   const [selectedContainer, setSelectedContainer] = useState<string>("");
   const [logFilter, setLogFilter] = useState("");
@@ -327,7 +327,7 @@ export default function Home() {
   }, [clusterSnapshot]);
 
   const visiblePodCatalog = useMemo(() => {
-    if (selectedNamespace === "all") return podCatalog;
+    if (!selectedNamespace) return [];
     return podCatalog.filter((pod) => pod.namespace === selectedNamespace);
   }, [podCatalog, selectedNamespace]);
 
@@ -1034,7 +1034,9 @@ export default function Home() {
                   setSelectedContainer("");
                 }}
               >
-                <option value="all">Todos los namespaces</option>
+                <option value="" disabled>
+                  Selecciona un namespace
+                </option>
                 {namespaceOptions.map((entry) => (
                   <option value={entry.namespace} key={entry.namespace}>
                     {entry.namespace} ({formatInteger(entry.pods)})
@@ -1077,8 +1079,8 @@ export default function Home() {
               })}
               {visiblePodCatalog.length ? null : (
                 <div className="empty-state">
-                  <b>No encontré pods con esos filtros.</b>
-                  <p>Prueba con otro namespace, otro nombre o limpia el filtro.</p>
+                  <b>Selecciona un namespace para ver pods.</b>
+                  <p>Así evitas cargar todo el clúster de una sola vez.</p>
                 </div>
               )}
             </div>
