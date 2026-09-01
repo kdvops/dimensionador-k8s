@@ -96,6 +96,7 @@ export function createOfflineSnapshot(reason, limit = 8) {
     },
     nodes: [],
     pods: [],
+    podCatalog: [],
     namespaces: [],
     limit: clamp(limit, 1, 20),
   };
@@ -156,6 +157,19 @@ export function buildClusterSnapshot({
     .sort((a, b) => b.cpuMillicores - a.cpuMillicores || b.memoryMiB - a.memoryMiB)
     .slice(0, clamp(limit, 1, 20));
 
+  const podCatalog = (podMetrics?.items ?? [])
+    .map((item) => {
+      const usage = sumUsage(item?.containers ?? []);
+      return {
+        namespace: item?.metadata?.namespace ?? "default",
+        name: item?.metadata?.name ?? "unknown",
+        node: item?.spec?.nodeName ?? "unknown",
+        cpuMillicores: usage.cpuMillicores,
+        memoryMiB: usage.memoryMiB,
+      };
+    })
+    .sort((a, b) => b.cpuMillicores - a.cpuMillicores || b.memoryMiB - a.memoryMiB);
+
   const namespaceTotals = new Map();
   for (const item of podMetrics?.items ?? []) {
     const usage = sumUsage(item?.containers ?? []);
@@ -208,6 +222,7 @@ export function buildClusterSnapshot({
     },
     nodes,
     pods,
+    podCatalog,
     namespaces: sortedNamespaces,
     limit: clamp(limit, 1, 20),
   };

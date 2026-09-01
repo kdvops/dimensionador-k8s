@@ -6,7 +6,7 @@ import {
   formatMemoryMiB,
 } from "./cluster-metrics.js";
 
-type View = "planner" | "cluster";
+type View = "planner" | "cluster" | "logs";
 type Profile = "general" | "compute" | "memory";
 
 type ClusterNode = {
@@ -52,8 +52,31 @@ type ClusterSnapshot = {
   };
   nodes: ClusterNode[];
   pods: ClusterPod[];
+  podCatalog: ClusterPod[];
   namespaces: ClusterNamespace[];
   limit: number;
+};
+
+type ClusterLogLine = {
+  number: number;
+  text: string;
+};
+
+type ClusterLogSnapshot = {
+  live: boolean;
+  source: string;
+  error?: string;
+  collectedAt: string;
+  namespace?: string;
+  pod?: string;
+  node?: string;
+  container?: string;
+  containers?: string[];
+  filter?: string;
+  tailLines?: number;
+  totalLines?: number;
+  matchedLines?: number;
+  lines?: ClusterLogLine[];
 };
 
 const profiles: Record<
@@ -159,6 +182,18 @@ export default function Home() {
   >("idle");
   const [clusterError, setClusterError] = useState<string | null>(null);
   const [clusterNonce, setClusterNonce] = useState(0);
+  const [podSearch, setPodSearch] = useState("");
+  const [selectedPodKey, setSelectedPodKey] = useState<string>("");
+  const [selectedContainer, setSelectedContainer] = useState<string>("");
+  const [logFilter, setLogFilter] = useState("");
+  const [logsNonce, setLogsNonce] = useState(0);
+  const [logsStatus, setLogsStatus] = useState<
+    "idle" | "loading" | "live" | "error"
+  >("idle");
+  const [logsError, setLogsError] = useState<string | null>(null);
+  const [logsSnapshot, setLogsSnapshot] = useState<ClusterLogSnapshot | null>(
+    null,
+  );
 
   const planner = useMemo(() => {
     const selectedProfile = profiles[profile];
@@ -201,7 +236,7 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (view !== "cluster") return;
+    if (view === "planner") return;
     const timer = setInterval(() => {
       setClusterNonce((value) => value + 1);
     }, 20_000);
@@ -209,11 +244,11 @@ export default function Home() {
   }, [view]);
 
   useEffect(() => {
-    if (view !== "cluster") return;
+    if (view === "planner") return;
     const controller = new AbortController();
 
     async function loadCluster() {
-      setClusterStatus((current) => (current === "idle" ? "loading" : current));
+      setClusterStatus("loading");
       setClusterError(null);
       try {
         const response = await fetch(`/api/cluster?limit=8`, {
@@ -240,10 +275,101 @@ export default function Home() {
     return () => controller.abort();
   }, [view, clusterNonce]);
 
+  useEffect(() => {
+    if (!clusterSnapshot?.podCatalog.length) return;
+    const key =
+      selectedPodKey &&
+      clusterSnapshot.podCatalog.some(
+        (pod) => `${pod.namespace}/${pod.name}` === selectedPodKey,
+      )
+        ? selectedPodKey
+        : `${clusterSnapshot.podCatalog[0].namespace}/${clusterSnapshot.podCatalog[0].name}`;
+    if (key !== selectedPodKey) {
+      setSelectedPodKey(key);
+      setSelectedContainer("");
+    }
+  }, [clusterSnapshot, selectedPodKey]);
+
   const refreshCluster = () => {
     setClusterNonce((value) => value + 1);
     if (view !== "cluster") setView("cluster");
   };
+
+  const refreshLogs = () => {
+    setLogsNonce((value) => value + 1);
+    setClusterNonce((value) => value + 1);
+    if (view !== "logs") setView("logs");
+  };
+
+  const podCatalog = useMemo(() => {
+    const catalog = clusterSnapshot?.podCatalog ?? [];
+    const query = podSearch.trim().toLowerCase();
+    if (!query) return catalog;
+    return catalog.filter((pod) => {
+      const haystack = `${pod.namespace} ${pod.name} ${pod.node}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [clusterSnapshot, podSearch]);
+
+  const selectedPod = useMemo(
+    () =>
+      clusterSnapshot?.podCatalog.find(
+        (pod) => `${pod.namespace}/${pod.name}` === selectedPodKey,
+      ) ?? null,
+    [clusterSnapshot, selectedPodKey],
+  );
+
+  const selectedPodIdentity = selectedPod
+    ? `${selectedPod.namespace}/${selectedPod.name}`
+    : "";
+
+  useEffect(() => {
+    if (view !== "logs") return;
+    const controller = new AbortController();
+
+    async function loadLogs() {
+      if (!selectedPod) {
+        setLogsSnapshot(null);
+        setLogsStatus("idle");
+        return;
+      }
+
+      setLogsStatus("loading");
+      setLogsError(null);
+
+      try {
+        const params = new URLSearchParams({
+          namespace: selectedPod.namespace,
+          pod: selectedPod.name,
+          tailLines: "300",
+        });
+        if (selectedContainer) params.set("container", selectedContainer);
+        if (logFilter.trim()) params.set("filter", logFilter.trim());
+
+        const response = await fetch(`/api/logs?${params.toString()}`, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+
+        const payload = (await response.json()) as ClusterLogSnapshot;
+        if (!response.ok || !payload.live) {
+          throw new Error(payload.error ?? `Logs API responded with ${response.status}`);
+        }
+
+        setLogsSnapshot(payload);
+        setLogsStatus("live");
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setLogsStatus("error");
+        setLogsError(
+          error instanceof Error ? error.message : "No se pudieron leer los logs",
+        );
+      }
+    }
+
+    loadLogs();
+    return () => controller.abort();
+  }, [view, selectedPodIdentity, selectedContainer, logFilter, logsNonce]);
 
   const Field = ({
     label,
@@ -796,8 +922,213 @@ export default function Home() {
     </>
   );
 
+  const logsView = (
+    <>
+      <section className="hero hero-logs" id="logs">
+        <div className="eyebrow">
+          <span />
+          LOGS DEL CLUSTER
+        </div>
+        <h1>
+          Explora logs de pods.
+          <br />
+          <em>Buscable y filtrable.</em>
+        </h1>
+        <p>
+          Busca pods por nombre, abre sus logs y filtra por texto sin salir del
+          panel.
+        </p>
+        <div className="hero-stats">
+          <span>
+            <b>{podCatalog.length}</b>
+            pods visibles
+          </span>
+          <span>
+            <b>{logsSnapshot?.matchedLines ?? 0}</b>
+            líneas filtradas
+          </span>
+          <span>
+            <b>{logsSnapshot?.container ?? "--"}</b>
+            contenedor activo
+          </span>
+        </div>
+      </section>
+
+      <section className="logs-dashboard">
+        <div className="dashboard-banner">
+          <div>
+            <p className="banner-label">Lectura de logs</p>
+            <h2>Filtra pods, cambia contenedor y busca texto dentro del stream.</h2>
+          </div>
+          <button className="refresh-button" type="button" onClick={refreshLogs}>
+            {logsStatus === "loading" ? "Leyendo..." : "Refrescar logs"}
+          </button>
+        </div>
+
+        {logsError ? (
+          <div className="empty-state warning">
+            <b>No pude leer logs ahora mismo.</b>
+            <p>{logsError}</p>
+            <small>
+              El endpoint usa la API del clúster y el `pods/log` subresource.
+            </small>
+          </div>
+        ) : null}
+
+        <div className="logs-grid">
+          <section className="dashboard-panel logs-sidebar">
+            <div className="panel-header">
+              <div>
+                <span className="panel-kicker">Pods</span>
+                <h3>Buscar por nombre</h3>
+              </div>
+              <small>{formatInteger(podCatalog.length)} resultados</small>
+            </div>
+            <label className="search-field">
+              <span>Filtro de pod</span>
+              <input
+                type="search"
+                value={podSearch}
+                onChange={(event) => setPodSearch(event.target.value)}
+                placeholder="api, worker, grafana..."
+              />
+            </label>
+            <div className="pod-catalog">
+              {podCatalog.map((pod) => {
+                const key = `${pod.namespace}/${pod.name}`;
+                const active = key === selectedPodKey;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className={active ? "pod-catalog-item active" : "pod-catalog-item"}
+                    onClick={() => {
+                      setSelectedPodKey(key);
+                      setSelectedContainer("");
+                      setLogsNonce((value) => value + 1);
+                      setView("logs");
+                    }}
+                  >
+                    <strong>{pod.name}</strong>
+                    <small>
+                      {pod.namespace} · {pod.node}
+                    </small>
+                  </button>
+                );
+              })}
+              {podCatalog.length ? null : (
+                <div className="empty-state">
+                  <b>No encontré pods con ese texto.</b>
+                  <p>Prueba con otro nombre o limpia el filtro.</p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="dashboard-panel logs-main">
+            <div className="panel-header">
+              <div>
+                <span className="panel-kicker">Visor</span>
+                <h3>
+                  {selectedPod ? `${selectedPod.namespace}/${selectedPod.name}` : "Selecciona un pod"}
+                </h3>
+              </div>
+              <small>{logsStatus === "live" ? "Live" : "Standby"}</small>
+            </div>
+
+            <div className="logs-meta">
+              <div>
+                <span>Namespace</span>
+                <b>{logsSnapshot?.namespace ?? selectedPod?.namespace ?? "--"}</b>
+              </div>
+              <div>
+                <span>Nodo</span>
+                <b>{logsSnapshot?.node ?? selectedPod?.node ?? "--"}</b>
+              </div>
+              <div>
+                <span>Líneas</span>
+                <b>
+                  {logsSnapshot?.matchedLines ?? 0}/{logsSnapshot?.totalLines ?? 0}
+                </b>
+              </div>
+              <div>
+                <span>Contenedor</span>
+                <b>{logsSnapshot?.container ?? selectedContainer ?? "--"}</b>
+              </div>
+            </div>
+
+            <div className="logs-controls">
+              <label className="search-field">
+                <span>Filtro de logs</span>
+                <input
+                  type="search"
+                  value={logFilter}
+                  onChange={(event) => setLogFilter(event.target.value)}
+                  placeholder="error, timeout, ready..."
+                />
+              </label>
+
+              <label className="search-field">
+                <span>Contenedor</span>
+                <select
+                  value={selectedContainer || logsSnapshot?.container || ""}
+                  onChange={(event) => setSelectedContainer(event.target.value)}
+                >
+                  <option value="">Auto</option>
+                  {(logsSnapshot?.containers ?? []).map((container) => (
+                    <option value={container} key={container}>
+                      {container}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="log-viewer">
+              {logsSnapshot?.lines?.length ? (
+                logsSnapshot.lines.map((line) => (
+                  <div className="log-line" key={line.number}>
+                    <span>{line.number}</span>
+                    <code>{line.text}</code>
+                  </div>
+                ))
+              ) : (
+                <div className="empty-state">
+                  <b>El log está vacío o aún no elegiste un pod.</b>
+                  <p>
+                    Selecciona un pod de la lista para empezar a inspeccionar su salida.
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <footer className="cluster-footer">
+          <div className="brand">
+            <span className="brand-mark">K</span>
+            <span>Logs View</span>
+          </div>
+          <p>
+            Lee logs desde `pods/log` con búsqueda por nombre de pod y filtro
+            de texto del stream.
+          </p>
+          <a href="#logs">Volver arriba ↑</a>
+        </footer>
+      </section>
+    </>
+  );
+
   return (
-    <main className={view === "cluster" ? "shell shell-cluster" : "shell shell-planner"}>
+    <main
+      className={
+        view === "cluster"
+          ? "shell shell-cluster"
+          : view === "logs"
+            ? "shell shell-logs"
+            : "shell shell-planner"
+      }
+    >
       <header className="topbar">
         <a className="brand" href="#inicio">
           <span className="brand-mark">K</span>
@@ -812,17 +1143,30 @@ export default function Home() {
           <TabButton active={view === "cluster"} onClick={() => setView("cluster")}>
             Cluster en vivo
           </TabButton>
+          <TabButton active={view === "logs"} onClick={() => setView("logs")}>
+            Logs
+          </TabButton>
         </nav>
         <button
           className="top-action"
           type="button"
-          onClick={view === "planner" ? reset : refreshCluster}
+          onClick={
+            view === "planner"
+              ? reset
+              : view === "cluster"
+                ? refreshCluster
+                : refreshLogs
+          }
         >
-          {view === "planner" ? "Restablecer" : "Actualizar"}
+          {view === "planner"
+            ? "Restablecer"
+            : view === "logs"
+              ? "Actualizar logs"
+              : "Actualizar"}
         </button>
       </header>
 
-      {view === "planner" ? plannerView : clusterView}
+      {view === "planner" ? plannerView : view === "cluster" ? clusterView : logsView}
     </main>
   );
 }

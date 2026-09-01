@@ -36,6 +36,12 @@ Scripts that need writable project-scoped home, npm, XDG, and temporary paths us
 - The Kubernetes deployment includes a dedicated `ServiceAccount`, `ClusterRole`, and `ClusterRoleBinding` so the pod can read nodes and pod metrics.
 - If the cluster API is unavailable, the dashboard shows a clear empty state instead of fake numbers.
 
+## Logs View
+
+- The `Logs` tab searches pods by name and reads live pod logs through `/api/logs`.
+- Logs can be filtered by substring before rendering, which keeps the panel usable on noisier workloads.
+- The RBAC bundle includes `pods/log` access so the pod can read stream output from the cluster.
+
 ## Workspace Auth Headers
 
 OpenAI workspace sites can read the current user's email from
