@@ -16,6 +16,8 @@ spec:
         app.kubernetes.io/name: dimensionador-k8s
         app.kubernetes.io/part-of: dimensionador-k8s
     spec:
+      serviceAccountName: dimensionador-k8s
+      automountServiceAccountToken: true
       containers:
         - name: web
           image: ghcr.io/kdvops/dimensionador-k8s:latest

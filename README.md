@@ -30,6 +30,12 @@ Scripts that need writable project-scoped home, npm, XDG, and temporary paths us
 - `examples/d1/` contains an optional D1 example surface
 - `drizzle.config.ts` supports local migration generation when needed
 
+## Cluster Dashboard
+
+- The `Cluster en vivo` tab reads live metrics from `metrics-server` through `/api/cluster`.
+- The Kubernetes deployment includes a dedicated `ServiceAccount`, `ClusterRole`, and `ClusterRoleBinding` so the pod can read nodes and pod metrics.
+- If the cluster API is unavailable, the dashboard shows a clear empty state instead of fake numbers.
+
 ## Workspace Auth Headers
 
 OpenAI workspace sites can read the current user's email from
