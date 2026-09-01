@@ -183,6 +183,7 @@ export default function Home() {
   const [clusterError, setClusterError] = useState<string | null>(null);
   const [clusterNonce, setClusterNonce] = useState(0);
   const [podSearch, setPodSearch] = useState("");
+  const [selectedNamespace, setSelectedNamespace] = useState<string>("all");
   const [selectedPodKey, setSelectedPodKey] = useState<string>("");
   const [selectedContainer, setSelectedContainer] = useState<string>("");
   const [logFilter, setLogFilter] = useState("");
@@ -275,21 +276,6 @@ export default function Home() {
     return () => controller.abort();
   }, [view, clusterNonce]);
 
-  useEffect(() => {
-    if (!clusterSnapshot?.podCatalog.length) return;
-    const key =
-      selectedPodKey &&
-      clusterSnapshot.podCatalog.some(
-        (pod) => `${pod.namespace}/${pod.name}` === selectedPodKey,
-      )
-        ? selectedPodKey
-        : `${clusterSnapshot.podCatalog[0].namespace}/${clusterSnapshot.podCatalog[0].name}`;
-    if (key !== selectedPodKey) {
-      setSelectedPodKey(key);
-      setSelectedContainer("");
-    }
-  }, [clusterSnapshot, selectedPodKey]);
-
   const refreshCluster = () => {
     setClusterNonce((value) => value + 1);
     if (view !== "cluster") setView("cluster");
@@ -310,6 +296,61 @@ export default function Home() {
       return haystack.includes(query);
     });
   }, [clusterSnapshot, podSearch]);
+
+  const namespaceOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const pod of clusterSnapshot?.podCatalog ?? []) {
+      counts.set(pod.namespace, (counts.get(pod.namespace) ?? 0) + 1);
+    }
+
+    const orderedNamespaces = (clusterSnapshot?.namespaces ?? [])
+      .map((entry) => entry.namespace)
+      .filter((namespace, index, all) => all.indexOf(namespace) === index);
+    const seen = new Set<string>();
+
+    const options = orderedNamespaces.map((namespace) => {
+      seen.add(namespace);
+      return {
+        namespace,
+        pods: counts.get(namespace) ?? 0,
+      };
+    });
+
+    for (const [namespace, pods] of [...counts.entries()].sort((a, b) =>
+      a[0].localeCompare(b[0]),
+    )) {
+      if (seen.has(namespace)) continue;
+      options.push({ namespace, pods });
+    }
+
+    return options;
+  }, [clusterSnapshot]);
+
+  const visiblePodCatalog = useMemo(() => {
+    if (selectedNamespace === "all") return podCatalog;
+    return podCatalog.filter((pod) => pod.namespace === selectedNamespace);
+  }, [podCatalog, selectedNamespace]);
+
+  useEffect(() => {
+    if (!visiblePodCatalog.length) {
+      if (selectedPodKey) setSelectedPodKey("");
+      if (selectedContainer) setSelectedContainer("");
+      return;
+    }
+
+    const key =
+      selectedPodKey &&
+      visiblePodCatalog.some(
+        (pod) => `${pod.namespace}/${pod.name}` === selectedPodKey,
+      )
+        ? selectedPodKey
+        : `${visiblePodCatalog[0].namespace}/${visiblePodCatalog[0].name}`;
+
+    if (key !== selectedPodKey) {
+      setSelectedPodKey(key);
+      setSelectedContainer("");
+    }
+  }, [visiblePodCatalog, selectedPodKey, selectedContainer]);
 
   const selectedPod = useMemo(
     () =>
@@ -980,10 +1021,27 @@ export default function Home() {
             <div className="panel-header">
               <div>
                 <span className="panel-kicker">Pods</span>
-                <h3>Buscar por nombre</h3>
+                <h3>Buscar por namespace y nombre</h3>
               </div>
-              <small>{formatInteger(podCatalog.length)} resultados</small>
+              <small>{formatInteger(visiblePodCatalog.length)} resultados</small>
             </div>
+            <label className="search-field">
+              <span>Namespace</span>
+              <select
+                value={selectedNamespace}
+                onChange={(event) => {
+                  setSelectedNamespace(event.target.value);
+                  setSelectedContainer("");
+                }}
+              >
+                <option value="all">Todos los namespaces</option>
+                {namespaceOptions.map((entry) => (
+                  <option value={entry.namespace} key={entry.namespace}>
+                    {entry.namespace} ({formatInteger(entry.pods)})
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="search-field">
               <span>Filtro de pod</span>
               <input
@@ -994,7 +1052,7 @@ export default function Home() {
               />
             </label>
             <div className="pod-catalog">
-              {podCatalog.map((pod) => {
+              {visiblePodCatalog.map((pod) => {
                 const key = `${pod.namespace}/${pod.name}`;
                 const active = key === selectedPodKey;
                 return (
@@ -1003,6 +1061,7 @@ export default function Home() {
                     type="button"
                     className={active ? "pod-catalog-item active" : "pod-catalog-item"}
                     onClick={() => {
+                      setSelectedNamespace(pod.namespace);
                       setSelectedPodKey(key);
                       setSelectedContainer("");
                       setLogsNonce((value) => value + 1);
@@ -1016,10 +1075,10 @@ export default function Home() {
                   </button>
                 );
               })}
-              {podCatalog.length ? null : (
+              {visiblePodCatalog.length ? null : (
                 <div className="empty-state">
-                  <b>No encontré pods con ese texto.</b>
-                  <p>Prueba con otro nombre o limpia el filtro.</p>
+                  <b>No encontré pods con esos filtros.</b>
+                  <p>Prueba con otro namespace, otro nombre o limpia el filtro.</p>
                 </div>
               )}
             </div>
@@ -1110,8 +1169,8 @@ export default function Home() {
             <span>Logs View</span>
           </div>
           <p>
-            Lee logs desde `pods/log` con búsqueda por nombre de pod y filtro
-            de texto del stream.
+            Lee logs desde `pods/log` con búsqueda por namespace, nombre de pod
+            y filtro de texto del stream.
           </p>
           <a href="#logs">Volver arriba ↑</a>
         </footer>
