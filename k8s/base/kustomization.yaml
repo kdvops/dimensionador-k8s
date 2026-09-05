@@ -6,3 +6,4 @@ resources:
   - deployment.yaml
   - service.yaml
   - virtualservice.yaml
+  - keda-http.yaml
