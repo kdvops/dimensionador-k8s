@@ -4,9 +4,18 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 4.0"
+      version = "~> 4.81"
+    }
+    azapi = {
+      source  = "Azure/azapi"
+      version = "~> 2.8"
     }
   }
+}
+
+provider "azapi" {
+  subscription_id = var.subscription_id
+  tenant_id       = var.tenant_id
 }
 
 provider "azurerm" {
@@ -46,6 +55,13 @@ resource "azurerm_container_app" "this" {
   resource_group_name          = azurerm_resource_group.this.name
   revision_mode                = var.revision_mode
   tags                         = var.tags
+
+  lifecycle {
+    precondition {
+      condition     = !var.custom_domain_enabled || var.ingress_external_enabled
+      error_message = "The managed certificate requires public ingress."
+    }
+  }
 
   dynamic "registry" {
     for_each = var.registry_server == null ? [] : [var.registry_server]

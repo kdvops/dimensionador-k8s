@@ -5,6 +5,12 @@ name                = "dimensionador-k8s"
 resource_group_name = "rg-dimensionador-k8s"
 location            = "East US"
 
+# Existing public Azure DNS zone (same subscription).
+custom_domain_enabled        = true
+dns_zone_name                = "azure.cloudainops.com"
+dns_zone_resource_group_name = "rg-cloudainops-dns"
+subdomain                    = "dimensionador"
+
 # Image published by .github/workflows/build.yml on pushes to main.
 # Available tags: latest, main, and sha-<short-commit-sha>.
 container_image = "ghcr.io/kdvops/dimensionador-k8s:latest"

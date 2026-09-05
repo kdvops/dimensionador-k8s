@@ -18,6 +18,35 @@ variable "name" {
   default     = "dimensionador-k8s"
 }
 
+variable "custom_domain_enabled" {
+  description = "Create DNS records and managed HTTPS for the application."
+  type        = bool
+  default     = true
+}
+
+variable "dns_zone_name" {
+  description = "Existing public Azure DNS zone in the same subscription."
+  type        = string
+  default     = "azure.cloudainops.com"
+}
+
+variable "dns_zone_resource_group_name" {
+  description = "Resource group that already contains the public DNS zone."
+  type        = string
+  default     = "rg-cloudainops-dns"
+}
+
+variable "subdomain" {
+  description = "Single DNS label to create within dns_zone_name."
+  type        = string
+  default     = "dimensionador"
+
+  validation {
+    condition     = can(regex("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$", var.subdomain))
+    error_message = "Use a DNS label of 1-63 lowercase letters, digits or internal hyphens."
+  }
+}
+
 variable "resource_group_name" {
   type    = string
   default = "rg-dimensionador-k8s"
