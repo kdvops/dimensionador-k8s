@@ -57,6 +57,29 @@ variable "location" {
   default = "East US"
 }
 
+variable "infrastructure_subnet_id" {
+  description = "Existing delegated subnet for the Container Apps environment. Required for a private environment."
+  type        = string
+  default     = null
+}
+
+variable "internal_load_balancer_enabled" {
+  description = "Expose the Container Apps environment through a private IP in the infrastructure subnet."
+  type        = bool
+  default     = false
+}
+
+variable "public_network_access" {
+  description = "Whether the Container Apps environment accepts traffic from the public network."
+  type        = string
+  default     = "Enabled"
+
+  validation {
+    condition     = contains(["Enabled", "Disabled"], var.public_network_access)
+    error_message = "public_network_access must be Enabled or Disabled."
+  }
+}
+
 variable "container_image" {
   description = "Container image, for example ghcr.io/org/app:tag or myacr.azurecr.io/app:tag."
   type        = string

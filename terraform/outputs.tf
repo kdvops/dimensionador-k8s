@@ -27,3 +27,8 @@ output "container_app_environment_id" {
   value = azurerm_container_app_environment.this.id
 }
 
+output "container_app_environment_static_private_ip" {
+  description = "Azure-assigned stable private IP of the Container Apps environment when internal load balancing is enabled."
+  value       = var.internal_load_balancer_enabled ? azurerm_container_app_environment.this.static_ip_address : null
+}
+

@@ -6,6 +6,7 @@ Este directorio crea:
 - Un Log Analytics Workspace.
 - Un Container Apps Environment.
 - Una Azure Container App con ingress HTTPS, escalado básico y soporte para registry privado.
+- Opcionalmente, un entorno integrado con una VNet y un balanceador interno con IP privada estable.
 - Los registros CNAME y TXT de `dimensionador.azure.cloudainops.com` en la zona DNS existente.
 - Un certificado administrado por Azure y su vinculación HTTPS, definidos íntegramente con Terraform.
 
@@ -66,7 +67,23 @@ La propagación DNS y emisión del certificado pueden tardar varios minutos. El 
 
 Si estos registros DNS ya existen fuera de este estado de Terraform, impórtalos antes de aplicar. Para usar solamente el dominio automático de Azure, establece `custom_domain_enabled = false`. `container_app_url` devuelve la URL elegida y `container_app_default_url` conserva la dirección automática.
 
-Referencias: [dominios y certificados administrados de Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/custom-domains-managed-certificates), [certificado administrado de AzureRM](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/container_app_environment_managed_certificate) y [AzAPI](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/update_resource).
+## IP privada estable
+
+Container Apps no asigna una IP privada fija independiente a cada aplicación o réplica. La IP estable es la `static_ip_address` del entorno compartido. Para habilitarla, proporciona el ID de una subnet dedicada y usa un entorno interno:
+
+```hcl
+infrastructure_subnet_id      = "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RG>/providers/Microsoft.Network/virtualNetworks/<VNET>/subnets/<SUBNET>"
+internal_load_balancer_enabled = true
+public_network_access          = "Disabled"
+ingress_external_enabled       = false
+custom_domain_enabled          = false
+```
+
+La subnet debe existir en la misma región, estar dedicada/delegada a Container Apps y cumplir el tamaño mínimo exigido por el perfil del entorno (AzureRM 4.81 documenta `/21` o mayor para `infrastructure_subnet_id`). Azure elige la IP estática dentro de esa subnet; Terraform la entrega en `container_app_environment_static_private_ip` después de crear el entorno. Cambiar de una implementación pública a interna fuerza la recreación del entorno, por lo que implica downtime.
+
+Para acceder con un nombre interno, crea una zona Azure Private DNS vinculada a la VNet y un registro A que apunte a esa IP. El dominio público y el certificado administrado definidos en `custom-domain.tf` deben permanecer desactivados en este modo, o sustituirse por DNS privado y un certificado existente.
+
+Referencias: [dominios y certificados administrados de Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/custom-domains-managed-certificates), [redes virtuales de Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/vnet-custom), [certificado administrado de AzureRM](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/container_app_environment_managed_certificate) y [AzAPI](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/update_resource).
 
 ## Pruebas locales
 

@@ -1,11 +1,13 @@
 # syntax=docker/dockerfile:1.7
 FROM node:22-bookworm-slim AS dependencies
 WORKDIR /app
+COPY .npmrc .
 COPY package.json package-lock.json ./
 RUN npm ci
 
 FROM dependencies AS build
 COPY . .
+SHELL ["/bin/bash", "-c"]
 RUN npm run build
 
 FROM node:22-bookworm-slim AS runtime

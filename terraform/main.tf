@@ -42,11 +42,26 @@ resource "azurerm_log_analytics_workspace" "this" {
 }
 
 resource "azurerm_container_app_environment" "this" {
-  name                       = "cae-${var.name}"
-  location                   = azurerm_resource_group.this.location
-  resource_group_name        = azurerm_resource_group.this.name
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
-  tags                       = var.tags
+  name                           = "cae-${var.name}"
+  location                       = azurerm_resource_group.this.location
+  resource_group_name            = azurerm_resource_group.this.name
+  log_analytics_workspace_id     = azurerm_log_analytics_workspace.this.id
+  infrastructure_subnet_id       = var.internal_load_balancer_enabled ? var.infrastructure_subnet_id : null
+  internal_load_balancer_enabled = var.internal_load_balancer_enabled ? true : null
+  public_network_access          = var.public_network_access
+  tags                           = var.tags
+
+  lifecycle {
+    precondition {
+      condition     = !var.internal_load_balancer_enabled || var.infrastructure_subnet_id != null
+      error_message = "An infrastructure_subnet_id is required when internal_load_balancer_enabled is true."
+    }
+
+    precondition {
+      condition     = !var.internal_load_balancer_enabled || var.public_network_access == "Disabled"
+      error_message = "public_network_access must be Disabled when internal_load_balancer_enabled is true."
+    }
+  }
 }
 
 resource "azurerm_container_app" "this" {
@@ -60,6 +75,16 @@ resource "azurerm_container_app" "this" {
     precondition {
       condition     = !var.custom_domain_enabled || var.ingress_external_enabled
       error_message = "The managed certificate requires public ingress."
+    }
+
+    precondition {
+      condition     = !var.internal_load_balancer_enabled || !var.custom_domain_enabled
+      error_message = "The current public DNS and managed-certificate configuration cannot be used with a private environment; set custom_domain_enabled to false or configure private DNS and an existing certificate."
+    }
+
+    precondition {
+      condition     = !var.internal_load_balancer_enabled || !var.ingress_external_enabled
+      error_message = "ingress_external_enabled must be false when internal_load_balancer_enabled is true."
     }
   }
 
