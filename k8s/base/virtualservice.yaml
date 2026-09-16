@@ -16,6 +16,6 @@ spec:
             prefix: /
       route:
         - destination:
-            host: dimensionador-k8s
+            host: keda-add-ons-http-interceptor-proxy.keda.svc.cluster.local
             port:
-              number: 80
+              number: 8080

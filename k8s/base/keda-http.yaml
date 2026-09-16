@@ -1,0 +1,35 @@
+apiVersion: http.keda.sh/v1beta1
+kind: InterceptorRoute
+metadata:
+  name: dimensionador-k8s
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  target:
+    service: dimensionador-k8s
+    port: 80
+  rules:
+    - hosts:
+        - dimensionador.kdvops.com
+  scalingMetric:
+    concurrency:
+      targetValue: 25
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: dimensionador-k8s
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  scaleTargetRef:
+    name: dimensionador-k8s
+    kind: Deployment
+  minReplicaCount: 0
+  maxReplicaCount: 3
+  cooldownPeriod: 300
+  triggers:
+    - type: external-push
+      metadata:
+        scalerAddress: keda-add-ons-http-external-scaler.keda:9090
+        interceptorRoute: dimensionador-k8s
